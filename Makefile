@@ -66,6 +66,6 @@ clean:
 	rm -rf $(gen_dir) $(out_dir) test_run_dir
 
 cleanall: clean
-	rm -rf target project/target
+	rm -rf target project/target project/project
 
 .PHONY: compile verilator run-tests run-custom-bmark clean cleanall
