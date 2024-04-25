@@ -1,34 +1,37 @@
-// See LICENSE for license details.
-
 package mini
 
 import chisel3._
 import chisel3.util._
 import junctions._
 
+/* input of cache IO (request) */
 class CacheReq(addrWidth: Int, dataWidth: Int) extends Bundle {
-  val addr = UInt(addrWidth.W)
-  val data = UInt(dataWidth.W)
-  val mask = UInt((dataWidth / 8).W)
+  val addr = UInt(addrWidth.W)        // request address
+  val data = UInt(dataWidth.W)        // data to write into cache
+  val mask = UInt((dataWidth / 8).W)  // all 0: read; otherwise: indicate which byte to write in a word
 }
 
+/* output of cache IO (response) */
 class CacheResp(dataWidth: Int) extends Bundle {
-  val data = UInt(dataWidth.W)
+  val data = UInt(dataWidth.W)  // data read from cache
 }
 
+/* both input and output of cache IO */
 class CacheIO(addrWidth: Int, dataWidth: Int) extends Bundle {
-  val abort = Input(Bool())
-  val req = Flipped(Valid(new CacheReq(addrWidth, dataWidth)))
-  val resp = Valid(new CacheResp(dataWidth))
+  val abort = Input(Bool())                                       // signal to abort write into cache
+  val req   = Flipped(Valid(new CacheReq(addrWidth, dataWidth)))  // input (request)   [valid, bits.addr, bits.data, bits.mask]
+  val resp  = Valid(new CacheResp(dataWidth))                     // output (response) [valid, bits.data]
 }
 
+/* IO of cache */
 class CacheModuleIO(nastiParams: NastiBundleParameters, addrWidth: Int, dataWidth: Int) extends Bundle {
-  val cpu = new CacheIO(addrWidth, dataWidth)
-  val nasti = new NastiBundle(nastiParams)
+  val cpu   = new CacheIO(addrWidth, dataWidth)  // interface to CPU side
+  val nasti = new NastiBundle(nastiParams)       // inferface to NASTI, i.e., lower level mem
 }
 
 case class CacheConfig(nWays: Int, nSets: Int, blockBytes: Int)
 
+/* tag of one set */
 class MetaData(tagLength: Int) extends Bundle {
   val tag = UInt(tagLength.W)
 }
@@ -39,27 +42,30 @@ object CacheState extends ChiselEnum {
 
 class Cache(val p: CacheConfig, val nasti: NastiBundleParameters, val xlen: Int) extends Module {
   // local parameters
-  val nSets = p.nSets
-  val bBytes = p.blockBytes
-  val bBits = bBytes << 3
-  val blen = log2Ceil(bBytes)
-  val slen = log2Ceil(nSets)
-  val tlen = xlen - (slen + blen)
-  val nWords = bBits / xlen
-  val wBytes = xlen / 8
-  val byteOffsetBits = log2Ceil(wBytes)
-  val dataBeats = bBits / nasti.dataBits
+  val nSets          = p.nSets                  // number of sets
+  val bBytes         = p.blockBytes             // number of bytes of a cache block
+  val bBits          = bBytes << 3              // number of bits of a cache block
+  val blen           = log2Ceil(bBytes)         // number of bits to represent block offset
+  val slen           = log2Ceil(nSets)          // number of bits to represent set address
+  val tlen           = xlen - (slen + blen)     // number of bits of tag
+  val nWords         = bBits / xlen             // number of words in a cache block
+  val wBytes         = xlen / 8                 // numbe of bytes in a word
+  val byteOffsetBits = log2Ceil(wBytes)         // byte offset in a word
+  val dataBeats      = bBits / nasti.dataBits   // how many beats to transfer a cache block
 
+  // IO
   val io = IO(new CacheModuleIO(nasti, addrWidth = xlen, dataWidth = xlen))
 
-  // cache states
-  import CacheState._
-  val state = RegInit(sIdle)
-  // memory
-  val v = RegInit(0.U(nSets.W))
-  val d = RegInit(0.U(nSets.W))
-  val metaMem = SyncReadMem(nSets, new MetaData(tlen))
-  val dataMem = Seq.fill(nWords)(SyncReadMem(nSets, Vec(wBytes, UInt(8.W))))
+  // cache state register
+  val state = RegInit(CacheState.sIdle)
+
+  // cache flags
+  val v = RegInit(0.U(nSets.W))  // valid bit of each set
+  val d = RegInit(0.U(nSets.W))  // dirty bit of each set
+
+  // cache memory
+  val metaMem = SyncReadMem(nSets, new MetaData(tlen))                        // tag of each set
+  val dataMem = Seq.fill(nWords)(SyncReadMem(nSets, Vec(wBytes, UInt(8.W))))  // actual cache: (block offset, set address, word offset)
 
   val addr_reg = Reg(chiselTypeOf(io.cpu.req.bits.addr))
   val cpu_data = Reg(chiselTypeOf(io.cpu.req.bits.data))
@@ -67,13 +73,14 @@ class Cache(val p: CacheConfig, val nasti: NastiBundleParameters, val xlen: Int)
 
   // Counters
   require(dataBeats > 0)
-  val (read_count, read_wrap_out) = Counter(io.nasti.r.fire, dataBeats)
+  val (read_count, read_wrap_out)   = Counter(io.nasti.r.fire, dataBeats)
   val (write_count, write_wrap_out) = Counter(io.nasti.w.fire, dataBeats)
 
-  val is_idle = state === sIdle
-  val is_read = state === sReadCache
-  val is_write = state === sWriteCache
-  val is_alloc = state === sRefill && read_wrap_out
+  //
+  val is_idle  = state === CacheState.sIdle
+  val is_read  = state === CacheState.sReadCache
+  val is_write = state === CacheState.sWriteCache
+  val is_alloc = state === CacheState.sRefill && read_wrap_out
   val is_alloc_reg = RegNext(is_alloc)
 
   val hit = Wire(Bool())
@@ -137,7 +144,7 @@ class Cache(val p: CacheConfig, val nasti: NastiBundleParameters, val xlen: Int)
   )
   io.nasti.ar.valid := false.B
   // read data
-  io.nasti.r.ready := state === sRefill
+  io.nasti.r.ready := state === CacheState.sRefill
   when(io.nasti.r.fire) {
     refill_buf(read_count) := io.nasti.r.bits.data
   }
@@ -163,62 +170,62 @@ class Cache(val p: CacheConfig, val nasti: NastiBundleParameters, val xlen: Int)
   // Cache FSM
   val is_dirty = v(idx_reg) && d(idx_reg)
   switch(state) {
-    is(sIdle) {
+    is(CacheState.sIdle) {
       when(io.cpu.req.valid) {
-        state := Mux(io.cpu.req.bits.mask.orR, sWriteCache, sReadCache)
+        state := Mux(io.cpu.req.bits.mask.orR, CacheState.sWriteCache, CacheState.sReadCache)
       }
     }
-    is(sReadCache) {
+    is(CacheState.sReadCache) {
       when(hit) {
         when(io.cpu.req.valid) {
-          state := Mux(io.cpu.req.bits.mask.orR, sWriteCache, sReadCache)
+          state := Mux(io.cpu.req.bits.mask.orR, CacheState.sWriteCache, CacheState.sReadCache)
         }.otherwise {
-          state := sIdle
+          state := CacheState.sIdle
         }
       }.otherwise {
         io.nasti.aw.valid := is_dirty
         io.nasti.ar.valid := !is_dirty
         when(io.nasti.aw.fire) {
-          state := sWriteBack
+          state := CacheState.sWriteBack
         }.elsewhen(io.nasti.ar.fire) {
-          state := sRefill
+          state := CacheState.sRefill
         }
       }
     }
-    is(sWriteCache) {
+    is(CacheState.sWriteCache) {
       when(hit || is_alloc_reg || io.cpu.abort) {
-        state := sIdle
+        state := CacheState.sIdle
       }.otherwise {
         io.nasti.aw.valid := is_dirty
         io.nasti.ar.valid := !is_dirty
         when(io.nasti.aw.fire) {
-          state := sWriteBack
+          state := CacheState.sWriteBack
         }.elsewhen(io.nasti.ar.fire) {
-          state := sRefill
+          state := CacheState.sRefill
         }
       }
     }
-    is(sWriteBack) {
+    is(CacheState.sWriteBack) {
       io.nasti.w.valid := true.B
       when(write_wrap_out) {
-        state := sWriteAck
+        state := CacheState.sWriteAck
       }
     }
-    is(sWriteAck) {
+    is(CacheState.sWriteAck) {
       io.nasti.b.ready := true.B
       when(io.nasti.b.fire) {
-        state := sRefillReady
+        state := CacheState.sRefillReady
       }
     }
-    is(sRefillReady) {
+    is(CacheState.sRefillReady) {
       io.nasti.ar.valid := true.B
       when(io.nasti.ar.fire) {
-        state := sRefill
+        state := CacheState.sRefill
       }
     }
-    is(sRefill) {
+    is(CacheState.sRefill) {
       when(read_wrap_out) {
-        state := Mux(cpu_mask.orR, sWriteCache, sIdle)
+        state := Mux(cpu_mask.orR, CacheState.sWriteCache, CacheState.sIdle)
       }
     }
   }

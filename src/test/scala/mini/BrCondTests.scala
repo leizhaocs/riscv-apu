@@ -73,28 +73,7 @@ class BrCondTester(br: => BrCond) extends BasicTester with TestUtils {
 }
 
 class BrCondTests extends AnyFlatSpec with ChiselScalatestTester with Formal {
-  "BrCondSimple" should "pass" in {
-    test(new BrCondTester(new BrCondSimple(32))).runUntilStop()
+  "BrCond" should "pass" in {
+    test(new BrCondTester(new BrCond(32))).runUntilStop()
   }
-  "BrCondArea" should "pass" in {
-    test(new BrCondTester(new BrCondArea(32))).runUntilStop()
-  }
-  "BrCondArea" should "be equivalent to BrCondSimple" in {
-    // since there is no state (registers/memory) in the BrCond, a single cycle check is enough to prove equivalence
-    verify(new BrCondEquivalenceCheck(new BrCondArea(32)), Seq(BoundedCheck(1)))
-  }
-}
-
-class BrCondEquivalenceCheck(other: => BrCond) extends Module {
-  val dut = Module(other)
-  val ref = Module(new BrCondSimple(dut.xlen))
-
-  // arbitrary inputs
-  val io = IO(chiselTypeOf(dut.io))
-
-  // connect the same inputs to both modules (the outputs will be overwritten to always connect to the reference)
-  dut.io <> io; ref.io <> io
-
-  // check to ensure that outputs are the same
-  assert(ref.io.taken === dut.io.taken, "taken: expected: %d, actual: %d", ref.io.taken, dut.io.taken)
 }

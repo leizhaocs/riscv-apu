@@ -10,7 +10,6 @@ import chiseltest.formal._
 import org.scalatest.flatspec.AnyFlatSpec
 
 class AluTester(alu: => Alu) extends BasicTester with TestUtils {
-  import Alu._
   val dut = Module(alu)
   val ctrl = Module(new Control)
   val xlen = dut.width
@@ -30,33 +29,33 @@ class AluTester(alu: => Alu) extends BasicTester with TestUtils {
   val sra = VecInit(rs1.zip(rs2).map { case (a, b) => toBigInt(a.toInt >> (b.toInt & 0x1f)).U(xlen.W) })
   val out = (
     Mux(
-      dut.io.alu_op === ALU_ADD,
+      dut.io.alu_op === AluOP.ALU_ADD,
       sum(cntr),
       Mux(
-        dut.io.alu_op === ALU_SUB,
+        dut.io.alu_op === AluOP.ALU_SUB,
         diff(cntr),
         Mux(
-          dut.io.alu_op === ALU_AND,
+          dut.io.alu_op === AluOP.ALU_AND,
           and(cntr),
           Mux(
-            dut.io.alu_op === ALU_OR,
+            dut.io.alu_op === AluOP.ALU_OR,
             or(cntr),
             Mux(
-              dut.io.alu_op === ALU_XOR,
+              dut.io.alu_op === AluOP.ALU_XOR,
               xor(cntr),
               Mux(
-                dut.io.alu_op === ALU_SLT,
+                dut.io.alu_op === AluOP.ALU_SLT,
                 slt(cntr),
                 Mux(
-                  dut.io.alu_op === ALU_SLTU,
+                  dut.io.alu_op === AluOP.ALU_SLTU,
                   sltu(cntr),
                   Mux(
-                    dut.io.alu_op === ALU_SLL,
+                    dut.io.alu_op === AluOP.ALU_SLL,
                     sll(cntr),
                     Mux(
-                      dut.io.alu_op === ALU_SRL,
+                      dut.io.alu_op === AluOP.ALU_SRL,
                       srl(cntr),
-                      Mux(dut.io.alu_op === ALU_SRA, sra(cntr), Mux(dut.io.alu_op === ALU_COPY_A, dut.io.A, dut.io.B))
+                      Mux(dut.io.alu_op === AluOP.ALU_SRA, sra(cntr), Mux(dut.io.alu_op === AluOP.ALU_COPY_A, dut.io.A, dut.io.B))
                     )
                   )
                 )
@@ -92,28 +91,6 @@ class AluTester(alu: => Alu) extends BasicTester with TestUtils {
 
 class ALUTests extends AnyFlatSpec with ChiselScalatestTester with Formal {
   "ALUSimple" should "pass" in {
-    test(new AluTester(new AluSimple(32))).runUntilStop()
+    test(new AluTester(new Alu(32))).runUntilStop()
   }
-  "AluArea" should "pass" in {
-    test(new AluTester(new AluArea(32))).runUntilStop()
-  }
-  "AluArea" should "be equivalent to AluSimple" in {
-    // since there is no state (registers/memory) in the ALU, a single cycle check is enough to prove equivalence
-    verify(new AluEquivalenceCheck(new AluArea(32)), Seq(BoundedCheck(1)))
-  }
-}
-
-class AluEquivalenceCheck(other: => Alu) extends Module {
-  val dut = Module(other)
-  val ref = Module(new AluSimple(dut.width))
-
-  // arbitrary inputs
-  val io = IO(chiselTypeOf(dut.io))
-
-  // connect the same inputs to both modules (the outputs will be overwritten to always connect to the reference)
-  dut.io <> io; ref.io <> io
-
-  // check to ensure that outputs are the same
-  assert(ref.io.out === dut.io.out, "out: expected: %d, actual: %d", ref.io.out, dut.io.out)
-  assert(ref.io.sum === dut.io.sum, "sum: %d, actual: %d", ref.io.sum, dut.io.sum)
 }

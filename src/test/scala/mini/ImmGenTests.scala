@@ -50,28 +50,7 @@ class ImmGenTester(imm: => ImmGen) extends BasicTester with TestUtils {
 }
 
 class ImmGenTests extends AnyFlatSpec with ChiselScalatestTester with Formal {
-  "ImmGenWire" should "pass" in {
-    test(new ImmGenTester(new ImmGenWire(32))).runUntilStop()
+  "ImmGen" should "pass" in {
+    test(new ImmGenTester(new ImmGen(32))).runUntilStop()
   }
-  "ImmGenMux" should "pass" in {
-    test(new ImmGenTester(new ImmGenMux(32))).runUntilStop()
-  }
-  "ImmGenMux" should "be equivalent to ImmGenWire" in {
-    // since there is no state (registers/memory) in the ImmGen, a single cycle check is enough to prove equivalence
-    verify(new ImmGenEquivalenceCheck(new ImmGenMux(32)), Seq(BoundedCheck(1)))
-  }
-}
-
-class ImmGenEquivalenceCheck(other: => ImmGen) extends Module {
-  val dut = Module(other)
-  val ref = Module(new ImmGenWire(dut.xlen))
-
-  // arbitrary inputs
-  val io = IO(chiselTypeOf(dut.io))
-
-  // connect the same inputs to both modules (the outputs will be overwritten to always connect to the reference)
-  dut.io <> io; ref.io <> io
-
-  // check to ensure that outputs are the same
-  assert(ref.io.out === dut.io.out, "out: expected: %d, actual: %d", ref.io.out, dut.io.out)
 }

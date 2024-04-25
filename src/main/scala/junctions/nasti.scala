@@ -1,6 +1,3 @@
-// See LICENSE.Berkeley for license details.
-// See LICENSE.SiFive for license details.
-
 package junctions
 import chisel3._
 import chisel3.util._
@@ -45,6 +42,8 @@ case class NastiBundleParameters(
   require(isPow2(dataBits), s"AXI4 data bits must be pow2 (got $dataBits)")
 }
 
+//==========================================================================================
+
 /** aka the AW/AR channel */
 class NastiAddressBundle(params: NastiBundleParameters) extends Bundle {
   val id = UInt(params.idBits.W)
@@ -74,6 +73,8 @@ object NastiAddressBundle {
   }
 }
 
+//--------------------------------------------
+
 /** aka the W-channel */
 class NastiWriteDataBundle(params: NastiBundleParameters) extends Bundle {
   // id removed
@@ -96,6 +97,8 @@ object NastiWriteDataBundle {
     w
   }
 }
+
+//--------------------------------------------
 
 /** aka the R-channel */
 class NastiReadDataBundle(params: NastiBundleParameters) extends Bundle {
@@ -122,6 +125,8 @@ object NastiReadDataBundle {
   }
 }
 
+//--------------------------------------------
+
 /** aka the B-channel */
 class NastiWriteResponseBundle(params: NastiBundleParameters) extends Bundle {
   val id = UInt(params.idBits.W)
@@ -137,29 +142,37 @@ object NastiWriteResponseBundle {
   }
 }
 
+//--------------------------------------------
+
+/* THIS IS THE IO THAT EACH MASTER AND SLAVE SHOULD HAVE */
 class NastiBundle(params: NastiBundleParameters) extends Bundle {
-  val aw = Decoupled(new NastiAddressBundle(params))
-  val w = Decoupled(new NastiWriteDataBundle(params))
-  val b = Flipped(Decoupled(new NastiWriteResponseBundle(params)))
-  val ar = Decoupled(new NastiAddressBundle(params))
-  val r = Flipped(Decoupled(new NastiReadDataBundle(params)))
+  val aw = Decoupled(new NastiAddressBundle(params))                 // write address
+  val w  = Decoupled(new NastiWriteDataBundle(params))               // write data
+  val b  = Flipped(Decoupled(new NastiWriteResponseBundle(params)))  // write response
+  val ar = Decoupled(new NastiAddressBundle(params))                 // read address
+  val r  = Flipped(Decoupled(new NastiReadDataBundle(params)))       // read data
 }
 
+//==========================================================================================
+
+/* IO of arbiter */
 class NastiArbiterIO(params: NastiBundleParameters, arbN: Int) extends Bundle {
   val master = Flipped(Vec(arbN, new NastiBundle(params)))
-  val slave = new NastiBundle(params)
+  val slave  = new NastiBundle(params)
 }
 
-/** Arbitrate among arbN masters requesting to a single slave */
+/** round-robin arbiter that arbitrates among arbN masters requesting to a single slave */
 class NastiArbiter(params: NastiBundleParameters, val arbN: Int) extends Module {
+  // IO
   val io = new NastiArbiterIO(params, arbN)
 
+  // arbN masters
   if (arbN > 1) {
+    // the actual arbiters
+    val ar_arb = Module(new RRArbiter(new NastiAddressBundle(params), arbN))  // read arbiter
+    val aw_arb = Module(new RRArbiter(new NastiAddressBundle(params), arbN))  // write arbiter
+
     val arbIdBits = log2Up(arbN)
-
-    val ar_arb = Module(new RRArbiter(new NastiAddressBundle(params), arbN))
-    val aw_arb = Module(new RRArbiter(new NastiAddressBundle(params), arbN))
-
     val slave_r_arb_id = io.slave.r.bits.id(arbIdBits - 1, 0)
     val slave_b_arb_id = io.slave.b.bits.id(arbIdBits - 1, 0)
 
@@ -178,21 +191,22 @@ class NastiArbiter(params: NastiBundleParameters, val arbN: Int) extends Module 
     for (i <- 0 until arbN) {
       val m_ar = io.master(i).ar
       val m_aw = io.master(i).aw
-      val m_r = io.master(i).r
-      val m_b = io.master(i).b
+      val m_r  = io.master(i).r
+      val m_b  = io.master(i).b
+      val m_w  = io.master(i).w
+
       val a_ar = ar_arb.io.in(i)
       val a_aw = aw_arb.io.in(i)
-      val m_w = io.master(i).w
 
       a_ar <> m_ar
       a_aw <> m_aw
 
-      m_r.valid := io.slave.r.valid && slave_r_arb_id === i.U
-      m_r.bits := io.slave.r.bits
+      m_r.valid   := io.slave.r.valid && slave_r_arb_id === i.U
+      m_r.bits    := io.slave.r.bits
       m_r.bits.id := io.slave.r.bits.id >> arbIdBits.U
 
-      m_b.valid := io.slave.b.valid && slave_b_arb_id === i.U
-      m_b.bits := io.slave.b.bits
+      m_b.valid   := io.slave.b.valid && slave_b_arb_id === i.U
+      m_b.bits    := io.slave.b.bits
       m_b.bits.id := io.slave.b.bits.id >> arbIdBits.U
 
       m_w.ready := io.slave.w.ready && w_chosen === i.U && !w_done
@@ -210,5 +224,5 @@ class NastiArbiter(params: NastiBundleParameters, val arbN: Int) extends Module 
     io.slave.aw.valid := aw_arb.io.out.valid && w_done
     aw_arb.io.out.ready := io.slave.aw.ready && w_done
 
-  } else { io.slave <> io.master.head }
+  } else { io.slave <> io.master.head }  // no arbiter needed if there is only one master
 }

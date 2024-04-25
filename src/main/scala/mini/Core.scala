@@ -7,17 +7,19 @@ import chisel3.util.Valid
 
 case class CoreConfig(
   xlen:       Int,
-  makeAlu:    Int => Alu = new AluSimple(_),
-  makeBrCond: Int => BrCond = new BrCondSimple(_),
-  makeImmGen: Int => ImmGen = new ImmGenWire(_))
+  makeAlu:    Int => Alu = new Alu(_),
+  makeBrCond: Int => BrCond = new BrCond(_),
+  makeImmGen: Int => ImmGen = new ImmGen(_))
 
+/* IO inside the core, i.e., communicate with CSR */
 class HostIO(xlen: Int) extends Bundle {
-  val fromhost = Flipped(Valid(UInt(xlen.W)))
-  val tohost = Output(UInt(xlen.W))
+  val fromhost = Flipped(Valid(UInt(xlen.W)))  // [valid, bits]
+  val tohost   = Output(UInt(xlen.W))          //
 }
 
+/* IO of core */
 class CoreIO(xlen: Int) extends Bundle {
-  val host = new HostIO(xlen)
+  val host   = new HostIO(xlen)
   val icache = Flipped(new CacheIO(xlen, xlen))
   val dcache = Flipped(new CacheIO(xlen, xlen))
 }

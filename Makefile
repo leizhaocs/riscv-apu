@@ -46,6 +46,14 @@ $(test_out_files): $(out_dir)/%.out: $(base_dir)/VTile $(base_dir)/tests/%.hex
 run-tests: $(test_out_files)
 
 ########################################################################
+# run isa tests benchmarks with verilator
+
+run-test-isa:
+	$(MAKE) -C test-isa
+	$(MAKE) -C test-isa hex
+	$(MAKE) -C test-isa run
+
+########################################################################
 # run custom benchmark
 
 custom_bmark_hex ?= $(base_dir)/custom-bmark/main.hex
@@ -64,6 +72,7 @@ run-custom-bmark: $(custom_bmark_out)
 
 clean:
 	rm -rf $(gen_dir) $(out_dir) test_run_dir
+	$(MAKE) -C test-isa clean
 
 cleanall: clean
 	rm -rf target project/target project/project
