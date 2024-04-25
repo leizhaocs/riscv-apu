@@ -6,4 +6,6 @@ generated-src/
 outputs/
 test_run_dir/
 
+test-isa/output/
+
 VTile
