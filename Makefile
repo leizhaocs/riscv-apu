@@ -54,6 +54,13 @@ run-test-isa:
 	$(MAKE) -C test-isa run
 
 ########################################################################
+# run custom tests benchmarks with verilator
+
+run-test-custom:
+	$(MAKE) -C test-custom/spike-extension
+	$(MAKE) -C test-custom/benchmarks
+
+########################################################################
 # run custom benchmark
 
 custom_bmark_hex ?= $(base_dir)/custom-bmark/main.hex
@@ -73,6 +80,8 @@ run-custom-bmark: $(custom_bmark_out)
 clean:
 	rm -rf $(gen_dir) $(out_dir) test_run_dir
 	$(MAKE) -C test-isa clean
+	$(MAKE) -C test-custom/spike-extension clean
+	$(MAKE) -C test-custom/benchmarks clean
 
 cleanall: clean
 	rm -rf target project/target project/project

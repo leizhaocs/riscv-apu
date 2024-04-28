@@ -8,4 +8,7 @@ test_run_dir/
 
 test-isa/output/
 
+test-custom/spike-extension/*.so
+test-custom/benchmarks/output/
+
 VTile
