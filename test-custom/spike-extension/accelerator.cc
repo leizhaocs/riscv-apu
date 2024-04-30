@@ -381,9 +381,6 @@ reg_t gemmini_t::CUSTOMFN(XCUSTOM_ACC)(rocc_insn_t insn, reg_t xs1, reg_t xs2)
     {
         compute(xs1, xs2, false);
     }
-    else if (insn.funct == flush_funct)
-    {
-    }
     else
     {
         illegal_instruction();

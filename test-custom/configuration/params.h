@@ -4,23 +4,19 @@
 #include <stdint.h>
 #include <limits.h>
 
-#define XCUSTOM_ACC 3
-#define DIM 16
-#define ADDR_LEN 32
-#define BANK_NUM 4
-#define BANK_ROWS 4096
-#define ACC_ROWS 1024
+#define XCUSTOM_ACC    3
+#define DIM           16
+#define ADDR_LEN      32
+#define BANK_NUM       4
+#define BANK_ROWS   4096
+#define ACC_ROWS    1024
 
 typedef int8_t elem_t;
 static const elem_t elem_t_max = 127;
 static const elem_t elem_t_min = -128;
 typedef int32_t acc_t;
 typedef int64_t full_t;
-
 typedef float scale_t;
-
-typedef int32_t scale_acc_t;
-
 typedef float acc_scale_t;
 
 #define row_align(blocks) __attribute__((aligned(blocks*DIM*sizeof(elem_t))))

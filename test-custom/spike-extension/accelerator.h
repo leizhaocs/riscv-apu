@@ -62,7 +62,6 @@ private:
   const unsigned compute_preloaded_funct = 4;
   const unsigned compute_accumulated_funct = 5;
   const unsigned preload_funct = 6;
-  const unsigned flush_funct = 7;
 
   elem_t mvin_scale(elem_t value, scale_t scale);
   elem_t acc_scale(acc_t value, acc_scale_t acc);

@@ -19,8 +19,6 @@ int main()
 {
     static elem_t ZERO[DIM][DIM];
 
-    gemmini_flush(0);
-
     gemmini_config_ld(DIM * sizeof(elem_t));
 
     static elem_t A[N][DIM][DIM] row_align(1);
