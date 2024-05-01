@@ -46,4 +46,4 @@ run benchmarks in spike:
 
     then in benchmarks/:
 
-        spike --isa=RV32G --extension=custom_acc -m0x80000000:0x81920,0x20000000:0x100 <path to compiled benchmark>
+        spike --isa=RV32GC --extension=custom_acc -m0x80000000:0x81920,0x20000000:0x100 <path to compiled benchmark>
