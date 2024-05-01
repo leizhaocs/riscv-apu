@@ -23,7 +23,7 @@ CFLAGS := \
 	-fno-common \
 	-fno-builtin-printf \
 	-fno-tree-loop-distribute-patterns \
-	-march=rv32g -Wa,-march=rv32g \
+	-march=rv32gc -Wa,-march=rv32gc \
 	-lm \
 	-lgcc \
 	-I$(COMPILE) \

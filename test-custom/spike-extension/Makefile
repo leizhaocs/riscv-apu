@@ -7,7 +7,7 @@ endif
 default: libcustom_acc.so
 
 libcustom_acc.so: accelerator.cc
-	g++ -L $(RISCV_ISA_SIM)/lib -Wl,-rpath,$(RISCV_ISA_SIM)/lib -shared -o $@ -std=c++20 -I $(RISCV_ISA_SIM)/include -I ../configuration -fPIC -O3 $^
+	g++ -L $(RISCV_ISA_SIM)/lib -Wl,-rpath,$(RISCV_ISA_SIM)/lib -shared -o $@ -std=c++2a -I $(RISCV_ISA_SIM)/include -I ../configuration -fPIC -O3 $^
 
 clean:
 	rm -rf *.o *.so
